@@ -1,0 +1,972 @@
+REPORT z_cuccu_goose_game.
+
+************************************************************************
+*Tabelle
+************************************************************************
+DATA: BEGIN OF player OCCURS 0,
+      nome(10),
+      abb(2),
+      posizione TYPE i,
+      turno(1),
+      END OF player.
+
+DATA: BEGIN OF campo OCCURS 0,
+    celltab TYPE lvc_t_styl,
+    color_cell  TYPE lvc_t_scol,
+    start(20),
+    campo1(20),
+    campo2(20),
+    campo3(20),
+    campo4(20),
+    campo5(20),
+    campo6(20),
+    campo7(20),
+    campo8(20),
+    campo9(20),
+    campo10(20),
+    campo11(20),
+    campo12(20),
+    campo13(20),
+    campo14(20),
+    campo15(20),
+    campo16(20),
+    campo17(20),
+    campo18(20),
+    campo19(20),
+    campo20(20),
+    campo21(20),
+    campo22(20),
+    campo23(20),
+    campo24(20),
+    campo25(20),
+    campo26(20),
+    campo27(20),
+    campo28(20),
+    campo29(20),
+    campo30(20),
+    campo31(20),
+    campo32(20),
+    campo33(20),
+    campo34(20),
+    campo35(20),
+    campo36(20),
+    campo37(20),
+    campo38(20),
+    campo39(20),
+    campo40(20),
+    campo41(20),
+    campo42(20),
+    campo43(20),
+    campo44(20),
+    campo45(20),
+    campo46(20),
+    campo47(20),
+    campo48(20),
+    campo49(20),
+    campo50(20),
+    campo51(20),
+    campo52(20),
+    campo53(20),
+    campo54(20),
+    campo55(20),
+    campo56(20),
+    campo57(20),
+    campo58(20),
+    campo59(20),
+    campo60(20),
+    campo61(20),
+    campo62(20),
+    campo63(20),
+      END OF campo.
+
+************************************************************************
+*PARAMETERS
+************************************************************************
+DATA dado1  TYPE i.
+DATA dado2  TYPE i.
+DATA totale TYPE i.
+DATA pl_num TYPE i.
+DATA contatore TYPE c.
+DATA play_turno(2) TYPE c.
+DATA testo_str TYPE string.
+DATA  ok_code LIKE sy-ucomm.
+DATA: gv_tabname(30) TYPE c VALUE 'CAMPO'.
+DATA: g_repid        LIKE sy-repid.
+
+CLASS lcl_event_handler DEFINITION DEFERRED.
+
+DATA: gr_event_handler      TYPE REF TO lcl_event_handler.
+DATA: gr_alvgrid            TYPE REF TO cl_gui_alv_grid.
+DATA: gr_docking_container  TYPE REF TO cl_gui_docking_container.
+DATA: gr_splitter_container TYPE REF TO cl_gui_splitter_container.
+DATA: gr_container          TYPE REF TO cl_gui_container.
+DATA: gs_layout   TYPE lvc_s_layo.
+DATA: gs_variant  TYPE disvariant.
+DATA: gs_print    TYPE lvc_s_prnt.
+DATA: gt_fieldcat TYPE lvc_t_fcat   WITH HEADER LINE.
+DATA: gt_exclude  TYPE ui_functions WITH HEADER LINE.
+DATA: gt_sort     TYPE lvc_t_sort   WITH HEADER LINE.
+DATA: gt_filter   TYPE lvc_t_filt   WITH HEADER LINE.
+
+SELECTION-SCREEN BEGIN OF BLOCK 1 WITH FRAME TITLE text-001.
+PARAMETERS: r_pl2  RADIOBUTTON GROUP r1,
+            r_pl3  RADIOBUTTON GROUP r1,
+            r_pl4  RADIOBUTTON GROUP r1.
+SELECTION-SCREEN SKIP 3.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(24) text-002 FOR FIELD p_play1.
+PARAMETERS: p_play1 TYPE string MODIF ID 2g.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(24) text-003 FOR FIELD p_play2.
+PARAMETERS: p_play2 TYPE string MODIF ID 2g.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(24) text-004 FOR FIELD p_play3.
+PARAMETERS: p_play3 TYPE string MODIF ID 3g.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(24) text-005 FOR FIELD p_play4.
+PARAMETERS: p_play4 TYPE string MODIF ID 4g.
+SELECTION-SCREEN END OF LINE.
+SELECTION-SCREEN END OF BLOCK 1.
+************************************************************************
+*CLASSI
+************************************************************************
+*&--------------------------------------------------------------------*
+*&      CLASS lcl_event_handler DEFINITION
+*&--------------------------------------------------------------------*
+CLASS lcl_event_handler DEFINITION.
+  PUBLIC SECTION.
+    METHODS:
+        handle_toolbar
+        FOR EVENT toolbar OF cl_gui_alv_grid
+            IMPORTING e_object e_interactive,
+
+        handle_user_command
+        FOR EVENT user_command OF cl_gui_alv_grid
+          IMPORTING e_ucomm.
+
+ENDCLASS.                    "lcl_event_handler DEFINITION
+*&--------------------------------------------------------------------*
+*&      CLASS lcl_event_handler IMPLEMENTATION
+*&--------------------------------------------------------------------*
+CLASS lcl_event_handler IMPLEMENTATION.
+  METHOD handle_toolbar.
+    DATA: ls_toolbar TYPE stb_button.
+
+    CLEAR  ls_toolbar.
+    MOVE   3 TO ls_toolbar-butn_type.
+    APPEND ls_toolbar TO e_object->mt_toolbar.
+    CLEAR  ls_toolbar.
+    MOVE   '&LANCIO_DADI' TO ls_toolbar-function.
+    MOVE   icon_compare TO ls_toolbar-icon.
+    MOVE   text-006 TO ls_toolbar-quickinfo.
+    MOVE   ' ' TO ls_toolbar-text.
+    MOVE   ' ' TO ls_toolbar-disabled.
+    APPEND ls_toolbar TO e_object->mt_toolbar.
+  ENDMETHOD.
+
+  METHOD handle_user_command.
+    CASE e_ucomm.
+      WHEN '&LANCIO_DADI'.
+        PERFORM lancio_dadi.
+        PERFORM spostamento.
+        PERFORM cambio_turno.
+        CALL METHOD gr_alvgrid->refresh_table_display.
+    ENDCASE.
+  ENDMETHOD.
+ENDCLASS.                    "lcl_event_handler IMPLEMENTATION
+************************************************************************
+*AT SELECTION-SCREEN OUTPUT
+************************************************************************
+AT SELECTION-SCREEN OUTPUT.
+  PERFORM screen.
+
+************************************************************************
+*START OF SELECTION
+************************************************************************
+START-OF-SELECTION.
+  PERFORM controllo.
+  PERFORM player_dati.
+  PERFORM iniz_campo.
+  LOOP AT player.
+    IF player-turno = 'X'.
+      play_turno = player-abb.
+    ENDIF.
+  ENDLOOP.
+  testo_str = text-008.
+  REPLACE '&&' WITH play_turno INTO testo_str.
+  MESSAGE i000(zf) WITH testo_str.
+  CALL SCREEN 100.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS 'STANDARD'.
+  SET TITLEBAR 'MAIN100'.
+  PERFORM stampa.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+  CASE ok_code.
+    WHEN 'BACK' OR 'EXIT'.
+      PERFORM exit_program.
+      EXIT.
+    WHEN OTHERS.
+      CALL METHOD cl_gui_cfw=>dispatch.
+  ENDCASE.
+  IF ok_code NE 'BACK' AND ok_code NE 'EXIT'.
+    CALL METHOD gr_alvgrid->refresh_table_display.
+  ENDIF.
+  CALL METHOD cl_gui_cfw=>flush.
+  CLEAR ok_code.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  EXIT_PROGRAM
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM exit_program .
+  IF gr_alvgrid IS NOT INITIAL.
+    CALL METHOD gr_alvgrid->set_autoredraw
+      EXPORTING
+        i_enable = 0.
+    CALL METHOD gr_alvgrid->free.
+  ENDIF.
+  CALL METHOD cl_gui_cfw=>flush.
+  SET SCREEN 0.
+  LEAVE SCREEN.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  STAMPA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM stampa .
+  IF gr_alvgrid IS INITIAL.
+    IF sy-batch = 'X'.
+      CREATE OBJECT gr_alvgrid
+        EXPORTING
+          i_parent = gr_docking_container.
+
+    ELSE.
+      CREATE OBJECT gr_splitter_container
+        EXPORTING
+          parent  = cl_gui_container=>screen0
+          rows    = 1
+          columns = 1.
+
+      CALL METHOD gr_splitter_container->set_border
+        EXPORTING
+          border = cl_gui_cfw=>false.
+      CALL METHOD gr_splitter_container->set_row_mode
+        EXPORTING
+          mode = gr_splitter_container->mode_relative.
+      gr_container =
+        gr_splitter_container->get_container( row = 1 column = 1 ).
+
+      CREATE OBJECT gr_alvgrid
+        EXPORTING
+          i_parent = gr_container.
+    ENDIF.
+
+    PERFORM prepare_layout.
+    PERFORM prepare_fieldcat.
+    PERFORM prepare_toolbar_exclude.
+
+    CREATE OBJECT gr_event_handler.
+
+    SET HANDLER gr_event_handler->handle_toolbar       FOR gr_alvgrid.
+    SET HANDLER gr_event_handler->handle_user_command  FOR gr_alvgrid.
+
+    CALL METHOD gr_alvgrid->set_table_for_first_display
+        EXPORTING
+          is_variant                    = gs_variant
+          i_save                        = 'A'
+          i_default                     = 'X'
+          is_layout                     = gs_layout
+          is_print                      = gs_print
+          it_toolbar_excluding          = gt_exclude[]
+        CHANGING
+          it_outtab                     = campo[]
+          it_fieldcatalog               = gt_fieldcat[]
+          it_sort                       = gt_sort[]
+          it_filter                     = gt_filter[]
+        EXCEPTIONS
+          invalid_parameter_combination = 1
+          program_error                 = 2
+          too_many_lines                = 3
+          OTHERS                        = 4.
+
+  ELSE.
+
+    CALL METHOD gr_alvgrid->refresh_table_display.
+
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_LAYOUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM prepare_layout .
+  CLEAR gs_layout.
+  gs_layout-zebra      = ' '.
+  gs_layout-no_merging = ' '.
+  gs_layout-no_rowmove = 'X'.
+  gs_layout-no_rowins  = 'X'.
+  gs_layout-no_f4      = ' '.
+  gs_layout-sel_mode   = 'D'.
+  gs_layout-stylefname = 'CELLTAB'.
+  gs_layout-ctab_fname = 'COLOR_CELL'.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM prepare_fieldcat .
+  DATA lt_fieldcat_slis TYPE slis_t_fieldcat_alv.
+  FIELD-SYMBOLS: <fs> LIKE LINE OF lt_fieldcat_slis.
+
+  g_repid = sy-repid.
+  CALL FUNCTION 'REUSE_ALV_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_program_name         = g_repid
+      i_internal_tabname     = gv_tabname
+      i_client_never_display = 'X'
+      i_inclname             = g_repid
+    CHANGING
+      ct_fieldcat            = lt_fieldcat_slis.
+
+  LOOP AT lt_fieldcat_slis ASSIGNING <fs>.
+    <fs>-tabname = gv_tabname.
+    CASE <fs>-fieldname.
+      WHEN 'START'.
+        <fs>-seltext_m   = 'START'.
+        <fs>-col_pos     = 1.
+      WHEN 'CAMPO1'.
+        <fs>-seltext_m   = '1'.
+        <fs>-col_pos     = 2.
+      WHEN 'CAMPO2'.
+        <fs>-seltext_m   = '2'.
+        <fs>-col_pos     = 3.
+      WHEN 'CAMPO3' .
+        <fs>-seltext_m   = '3'.
+        <fs>-col_pos     = 4.
+      WHEN 'CAMPO4'.
+        <fs>-seltext_m   = '4'.
+        <fs>-col_pos     = 5.
+      WHEN 'CAMPO5'.
+        <fs>-seltext_m   = '5 THE_GOOSE'.
+        <fs>-col_pos     = 6.
+      WHEN 'CAMPO6'.
+        <fs>-seltext_m   = '6 BRIDGE'.
+        <fs>-col_pos     = 7.
+      WHEN 'CAMPO7'.
+        <fs>-seltext_m   = '7'.
+        <fs>-col_pos     = 8.
+      WHEN 'CAMPO8'.
+        <fs>-seltext_m   = '8'.
+        <fs>-col_pos     = 9.
+      WHEN 'CAMPO9'.
+        <fs>-seltext_m   = '9 THE_GOOSE'.
+        <fs>-col_pos     = 10.
+      WHEN 'CAMPO10'.
+        <fs>-seltext_m   = '10'.
+        <fs>-col_pos     = 11.
+      WHEN 'CAMPO11'.
+        <fs>-seltext_m   = '11'.
+        <fs>-col_pos     = 12.
+      WHEN 'CAMPO12'.
+        <fs>-seltext_m   = '12'.
+        <fs>-col_pos     = 13.
+      WHEN 'CAMPO13'.
+        <fs>-seltext_m   = '13'.
+        <fs>-col_pos     = 14.
+      WHEN 'CAMPO14'.
+        <fs>-seltext_m   = '14 THE_GOOSE'.
+        <fs>-col_pos     = 15.
+      WHEN 'CAMPO15'.
+        <fs>-seltext_m   = '15'.
+        <fs>-col_pos     = 16.
+      WHEN 'CAMPO16'.
+        <fs>-seltext_m   = '16'.
+        <fs>-col_pos     = 17.
+      WHEN 'CAMPO17' .
+        <fs>-seltext_m   = '17'.
+        <fs>-col_pos     = 18.
+      WHEN 'CAMPO18'.
+        <fs>-seltext_m   = '18 THE_GOOSE'.
+        <fs>-col_pos     = 19.
+      WHEN 'CAMPO19'.
+        <fs>-seltext_m   = '19'.
+        <fs>-col_pos     = 20.
+      WHEN 'CAMPO20'.
+        <fs>-seltext_m   = '20'.
+        <fs>-col_pos     = 21.
+      WHEN 'CAMPO21'.
+        <fs>-seltext_m   = '21'.
+        <fs>-col_pos     = 22.
+      WHEN 'CAMPO22'.
+        <fs>-seltext_m   = '22'.
+        <fs>-col_pos     = 23.
+      WHEN 'CAMPO23'.
+        <fs>-seltext_m   = '23 THE_GOOSE'.
+        <fs>-col_pos     = 24.
+      WHEN 'CAMPO24'.
+        <fs>-seltext_m   = '24'.
+        <fs>-col_pos     = 25.
+      WHEN 'CAMPO25'.
+        <fs>-seltext_m   = '25'.
+        <fs>-col_pos     = 26.
+      WHEN 'CAMPO26' .
+        <fs>-seltext_m   = '26'.
+        <fs>-col_pos     = 27.
+      WHEN 'CAMPO27'.
+        <fs>-seltext_m   = '27 THE_GOOSE'.
+        <fs>-col_pos     = 28.
+      WHEN 'CAMPO28'.
+        <fs>-seltext_m   = '28'.
+        <fs>-col_pos     = 29.
+      WHEN 'CAMPO29'.
+        <fs>-seltext_m   = '29'.
+        <fs>-col_pos     = 30.
+      WHEN 'CAMPO30'.
+        <fs>-seltext_m   = '30'.
+        <fs>-col_pos     = 31.
+      WHEN 'CAMPO31'.
+        <fs>-seltext_m   = '31'.
+        <fs>-col_pos     = 32.
+      WHEN 'CAMPO32'.
+        <fs>-seltext_m   = '32'.
+        <fs>-col_pos     = 33.
+      WHEN 'CAMPO33'.
+        <fs>-seltext_m   = '33'.
+        <fs>-col_pos     = 34.
+      WHEN 'CAMPO34'.
+        <fs>-seltext_m   = '34'.
+        <fs>-col_pos     = 35.
+      WHEN 'CAMPO35'.
+        <fs>-seltext_m   = '35'.
+        <fs>-col_pos     = 36.
+      WHEN 'CAMPO36'.
+        <fs>-seltext_m   = '36'.
+        <fs>-col_pos     = 37.
+      WHEN 'CAMPO37'.
+        <fs>-seltext_m   = '37'.
+        <fs>-col_pos     = 38.
+      WHEN 'CAMPO38'.
+        <fs>-seltext_m   = '38'.
+        <fs>-col_pos     = 39.
+      WHEN 'CAMPO39'.
+        <fs>-seltext_m   = '39'.
+        <fs>-col_pos     = 40.
+      WHEN 'CAMPO40' .
+        <fs>-seltext_m   = '40'.
+        <fs>-col_pos     = 41.
+      WHEN 'CAMPO41'.
+        <fs>-seltext_m   = '41'.
+        <fs>-col_pos     = 42.
+      WHEN 'CAMPO42'.
+        <fs>-seltext_m   = '42'.
+        <fs>-col_pos     = 43.
+      WHEN 'CAMPO43'.
+        <fs>-seltext_m   = '43'.
+        <fs>-col_pos     = 44.
+      WHEN 'CAMPO44'.
+        <fs>-seltext_m   = '44'.
+        <fs>-col_pos     = 45.
+      WHEN 'CAMPO45'.
+        <fs>-seltext_m   = '45'.
+        <fs>-col_pos     = 46.
+      WHEN 'CAMPO46'.
+        <fs>-seltext_m   = '46'.
+        <fs>-col_pos     = 47.
+      WHEN 'CAMPO47'.
+        <fs>-seltext_m   = '47'.
+        <fs>-col_pos     = 48.
+      WHEN 'CAMPO48'.
+        <fs>-seltext_m   = '48'.
+        <fs>-col_pos     = 49.
+      WHEN 'CAMPO49'.
+        <fs>-seltext_m   = '49'.
+        <fs>-col_pos     = 50.
+      WHEN 'CAMPO50'.
+        <fs>-seltext_m   = '50'.
+        <fs>-col_pos     = 51.
+      WHEN 'CAMPO51'.
+        <fs>-seltext_m   = '51'.
+        <fs>-col_pos     = 52.
+      WHEN 'CAMPO52'.
+        <fs>-seltext_m   = '52'.
+        <fs>-col_pos     = 53.
+      WHEN 'CAMPO53'.
+        <fs>-seltext_m   = '53'.
+        <fs>-col_pos     = 54.
+      WHEN 'CAMPO54'.
+        <fs>-seltext_m   = '54'.
+        <fs>-col_pos     = 55.
+      WHEN 'CAMPO55'.
+        <fs>-seltext_m   = '55'.
+        <fs>-col_pos     = 56.
+      WHEN 'CAMPO56'.
+        <fs>-seltext_m   = '56'.
+        <fs>-col_pos     = 57.
+      WHEN 'CAMPO57'.
+        <fs>-seltext_m   = '57'.
+        <fs>-col_pos     = 58.
+      WHEN 'CAMPO58'.
+        <fs>-seltext_m   = '58'.
+        <fs>-col_pos     = 59.
+      WHEN 'CAMPO59'.
+        <fs>-seltext_m   = '59'.
+        <fs>-col_pos     = 60.
+      WHEN 'CAMPO60'.
+        <fs>-seltext_m   = '60'.
+        <fs>-col_pos     = 61.
+      WHEN 'CAMPO61'.
+        <fs>-seltext_m   = '61'.
+        <fs>-col_pos     = 62.
+      WHEN 'CAMPO62'.
+        <fs>-seltext_m   = '62'.
+        <fs>-col_pos     = 63.
+      WHEN 'CAMPO63'.
+        <fs>-seltext_m   = '63 FINISH'.
+        <fs>-col_pos     = 64.
+      WHEN OTHERS.
+        <fs>-no_out = 'X'.
+    ENDCASE.
+  ENDLOOP.
+
+  CALL FUNCTION 'LVC_TRANSFER_FROM_SLIS'
+    EXPORTING
+      it_fieldcat_alv = lt_fieldcat_slis
+    IMPORTING
+      et_fieldcat_lvc = gt_fieldcat[]
+    TABLES
+      it_data         = campo[]
+    EXCEPTIONS
+      it_data_missing = 1
+      OTHERS          = 2.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_TOOLBAR_EXCLUDE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM prepare_toolbar_exclude .
+  gt_exclude = cl_gui_alv_grid=>mc_fc_loc_cut.
+  APPEND gt_exclude.
+  gt_exclude = cl_gui_alv_grid=>mc_fc_loc_copy.
+  APPEND gt_exclude.
+  gt_exclude = cl_gui_alv_grid=>mc_fc_loc_paste.
+  APPEND gt_exclude.
+  gt_exclude = cl_gui_alv_grid=>mc_fc_loc_paste_new_row.
+  APPEND gt_exclude.
+  gt_exclude = cl_gui_alv_grid=>mc_fc_loc_undo.
+  APPEND gt_exclude.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SCREEN
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM screen .
+  LOOP AT SCREEN.
+    IF r_pl2 = 'X'.
+      IF: screen-group1 = '3G' OR
+          screen-group1 = '4G'.
+        screen-active = '0'.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+    IF r_pl3 = 'X'.
+      IF: screen-group1 = '4G'.
+        screen-active = '0'.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PLAYER_DATI
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM player_dati .
+  CLEAR: player, pl_num .
+  REFRESH player.
+  IF r_pl2 = 'X'.
+    player-nome = p_play1.
+    player-abb = p_play1.
+    player-posizione = 0.
+    player-turno = 'X'.
+    APPEND player.
+    player-nome = p_play2.
+    player-abb = p_play2.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+  ENDIF.
+  IF r_pl3 = 'X'.
+    player-nome = p_play1.
+    player-abb = p_play1.
+    player-posizione = 0.
+    player-turno = 'X'.
+    APPEND player.
+    player-nome = p_play2.
+    player-abb = p_play2.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+    player-nome = p_play3.
+    player-abb = p_play3.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+  ENDIF.
+  IF r_pl4 = 'X'.
+    player-nome = p_play1.
+    player-abb = p_play1.
+    player-posizione = 0.
+    player-turno = 'X'.
+    APPEND player.
+    player-nome = p_play2.
+    player-abb = p_play2.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+    player-nome = p_play3.
+    player-abb = p_play3.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+    player-nome = p_play4.
+    player-abb = p_play4.
+    player-posizione = 0.
+    player-turno = ' '.
+    APPEND player.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  LANCIO_DADI
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM lancio_dadi .
+  DATA: testo    TYPE string,
+        tot(3)   TYPE c,
+        pl(2)    TYPE c,
+        posiz(3) TYPE c.
+  FIELD-SYMBOLS: <fs1> LIKE campo, <fs2> TYPE any.
+  CLEAR: dado1, dado2, totale, testo.
+
+  LOOP AT player.
+    IF player-turno = 'X'.
+      IF player-posizione = 0.
+        testo = 'START'.
+      ELSE.
+        posiz = player-posizione.
+        CONCATENATE 'CAMPO' posiz INTO testo.
+        CONDENSE testo NO-GAPS.
+      ENDIF.
+      LOOP AT campo ASSIGNING <fs1>.
+        ASSIGN COMPONENT testo OF STRUCTURE <fs1> TO <fs2>.
+        REPLACE player-abb WITH '' INTO <fs2>.
+      ENDLOOP.
+
+      " generatore di numeri casuali da 1 a 6 per dado 1
+      CALL FUNCTION 'QF05_RANDOM_INTEGER'
+   EXPORTING
+     ran_int_max         = 6
+     ran_int_min         = 1
+   IMPORTING
+     ran_int             = dado1
+   EXCEPTIONS
+     invalid_input       = 1
+     OTHERS              = 2.
+
+      " generatore di numeri casuali da 1 a 6 per dado 2
+      CALL FUNCTION 'QF05_RANDOM_INTEGER'
+       EXPORTING
+         ran_int_max         = 6
+         ran_int_min         = 1
+       IMPORTING
+         ran_int             = dado2
+       EXCEPTIONS
+         invalid_input       = 1
+         OTHERS              = 2.
+
+      totale = dado1 + dado2.
+      tot = totale.
+      MESSAGE i000(zf) WITH text-007 dado1 dado2.
+
+      pl = player-abb.
+      player-posizione = player-posizione + totale.
+      MODIFY player.
+
+      testo = '&& si sposta di || posizioni'.
+      REPLACE '&&' WITH pl INTO testo.
+      REPLACE '||' WITH tot INTO testo.
+      MESSAGE i000(zf) WITH testo.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SPOSTAMENTO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM spostamento .
+  DATA: pos(2) TYPE c,
+        ecc(2) TYPE c,
+        lv_str  TYPE string,
+        lv_str2 TYPE string,
+        lv_str3 TYPE string,
+        text    TYPE string,
+        sytabix TYPE sy-tabix.
+  FIELD-SYMBOLS: <fs1> LIKE campo, <fs2> TYPE any.
+
+  CLEAR: pos, lv_str.
+
+  LOOP AT player.
+    sytabix = sy-tabix.
+    IF player-turno = 'X'.
+      pos = player-posizione.
+
+      IF pos > 63.
+        ecc = pos - 63.
+        pos = 63 - ecc.
+        player-posizione = pos.
+      ENDIF.
+
+      CONCATENATE 'CAMPO' pos INTO lv_str.
+      LOOP AT campo ASSIGNING <fs1>.
+        ASSIGN COMPONENT lv_str OF STRUCTURE <fs1> TO <fs2>.
+        CONCATENATE <fs2> player-abb INTO <fs2>.
+
+
+        CASE lv_str.
+          WHEN 'CAMPO63'.
+            CLEAR text.
+            text = text-009.
+            REPLACE '&&' WITH player-abb INTO text.
+            MESSAGE i000(zf) WITH text.
+            LEAVE PROGRAM.
+
+          WHEN 'CAMPO6'.
+            CLEAR: text, lv_str2.
+            text = text-011.
+            REPLACE '&&' WITH player-abb INTO text.
+            MESSAGE i000(zf) WITH text.
+            player-posizione = 12.
+            pos = player-posizione.
+            "CANCELLO VECCHIA POSIZIONE
+            ASSIGN COMPONENT lv_str OF STRUCTURE <fs1> TO <fs2>.
+            CLEAR <fs2>.
+            "AGGIUNGO NUOVA POSIZIONE
+            CONCATENATE 'CAMPO' pos INTO lv_str2.
+            ASSIGN COMPONENT lv_str2 OF STRUCTURE <fs1> TO <fs2>.
+            CONCATENATE <fs2> player-abb INTO <fs2>.
+
+          WHEN 'CAMPO5' OR 'CAMPO9' OR 'CAMPO14' OR
+               'CAMPO18' OR 'CAMPO23' OR 'CAMPO27'.
+            CLEAR: text, lv_str2.
+            text = text-012.
+            REPLACE '&&' WITH player-abb INTO text.
+            REPLACE '||' WITH pos INTO text.
+            MESSAGE i000(zf) WITH text.
+            pos = pos + player-posizione.
+            CONCATENATE 'CAMPO' pos INTO lv_str2.
+            IF lv_str2 = 'CAMPO9' OR lv_str2 = 'CAMPO14' OR
+               lv_str2 = 'CAMPO18'OR lv_str2 = 'CAMPO23' OR
+               lv_str2 = 'CAMPO27'.
+              CLEAR: text, lv_str3.
+              text = text-012.
+              REPLACE '&&' WITH player-abb INTO text.
+              REPLACE '||' WITH pos INTO text.
+              MESSAGE i000(zf) WITH text.
+              pos = pos + player-posizione.
+              player-posizione = pos.
+              "CANCELLO VECCHIA POSIZIONE
+              ASSIGN COMPONENT lv_str OF STRUCTURE <fs1> TO <fs2>.
+              CLEAR <fs2>.
+              "AGGIUNGO NUOVA POSIZIONE
+              CONCATENATE 'CAMPO' pos INTO lv_str3.
+              ASSIGN COMPONENT lv_str3 OF STRUCTURE <fs1> TO <fs2>.
+              CONCATENATE <fs2> player-abb INTO <fs2>.
+            ELSE.
+              "CANCELLO VECCHIA POSIZIONE
+              ASSIGN COMPONENT lv_str OF STRUCTURE <fs1> TO <fs2>.
+              CLEAR <fs2>.
+              "AGGIUNGO NUOVA POSIZIONE
+              ASSIGN COMPONENT lv_str2 OF STRUCTURE <fs1> TO <fs2>.
+              CONCATENATE <fs2> player-abb INTO <fs2>.
+            ENDIF.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+      pl_num = pl_num + 1.
+    ENDIF.
+    MODIFY player.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CONTROLLO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM controllo .
+  IF r_pl2 = 'X'.
+    IF p_play1 IS INITIAL OR p_play2 IS INITIAL.
+      MESSAGE e000(zf) WITH text-010.
+      EXIT.
+    ENDIF.
+  ENDIF.
+  IF r_pl3 = 'X'.
+    IF p_play1 IS INITIAL OR p_play2 IS INITIAL OR p_play3 IS INITIAL.
+      MESSAGE e000(zf) WITH text-010.
+      EXIT.
+    ENDIF.
+  ENDIF.
+  IF r_pl4 = 'X'.
+    IF p_play1 IS INITIAL OR p_play2 IS INITIAL OR p_play3 IS INITIAL
+       OR p_play4 IS INITIAL.
+      MESSAGE e000(zf) WITH text-010.
+      EXIT.
+    ENDIF.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  INIZ_CAMPO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM iniz_campo .
+  LOOP AT player.
+    CONCATENATE campo-start player-abb INTO campo-start
+    SEPARATED BY space.
+  ENDLOOP.
+  APPEND campo.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CAMBIO_TURNO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM cambio_turno .
+  DATA text TYPE string.
+  DATA sytabix TYPE sy-tabix.
+
+  LOOP AT player.
+    sytabix = sy-tabix.
+    IF r_pl2 = 'X'.
+      IF pl_num > 2.
+        CLEAR pl_num.
+        pl_num = 1.
+      ENDIF.
+      IF pl_num EQ sy-tabix.
+        player-turno = ' '.
+        CLEAR text.
+        text = text-013.
+        REPLACE '&&' WITH player-abb INTO text.
+        MESSAGE i000(zf) WITH text.
+      ELSE.
+        player-turno = 'X'.
+        CLEAR text.
+        text = text-008.
+        REPLACE '&&' WITH player-abb INTO text.
+        MESSAGE i000(zf) WITH text.
+      ENDIF.
+    ENDIF.
+    IF r_pl3 = 'X'.
+      IF pl_num > 3.
+        CLEAR pl_num.
+        pl_num = 1.
+      ENDIF.
+      IF pl_num EQ sy-tabix.
+        player-turno = ' '.
+        contatore = 'X'.
+        CLEAR text.
+        text = text-013.
+        REPLACE '&&' WITH player-abb INTO text.
+        MESSAGE i000(zf) WITH text.
+      ELSE.
+        IF contatore = 'X'.
+          player-turno = 'X'.
+          CLEAR: text, contatore.
+          text = text-008.
+          REPLACE '&&' WITH player-abb INTO text.
+          MESSAGE i000(zf) WITH text.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+    IF r_pl4 = 'X'.
+      IF pl_num > 4.
+        CLEAR pl_num.
+        pl_num = 1.
+      ENDIF.
+      IF pl_num EQ sy-tabix.
+        player-turno = ' '.
+        contatore = 'X'.
+        CLEAR text.
+        text = text-013.
+        REPLACE '&&' WITH player-abb INTO text.
+        MESSAGE i000(zf) WITH text.
+      ELSE.
+       IF contatore = 'X'.
+          player-turno = 'X'.
+          CLEAR: text, contatore.
+          text = text-008.
+          REPLACE '&&' WITH player-abb INTO text.
+          MESSAGE i000(zf) WITH text.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+    MODIFY player.
+  ENDLOOP.
+ENDFORM.
